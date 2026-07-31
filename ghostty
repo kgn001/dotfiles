@@ -1,0 +1,8 @@
+# Need to add base file that gets copied to $HOME/.config that points to ~/.dotfiles/ghostty
+
+font-family = JetBrainsMono Nerd Font
+
+background-opacity = 0.85
+
+clipboard-write = allow
+copy-on-select = clipboard

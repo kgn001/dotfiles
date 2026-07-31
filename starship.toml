@@ -1,0 +1,91 @@
+format = """
+${custom.hostblock}\
+$directory\
+[](fg:dir_bg bg:git_bg)\
+$git_branch$git_status\
+[](fg:git_bg)\
+$fill$time\
+$line_break$os$character\
+"""
+
+add_newline = true
+
+palette = "custom"
+
+[palettes.custom]
+host_bg = "#458588"
+dir_bg  = "#689d6a"
+git_bg  = "#d65d0e"
+text    = "#fbf1c7"
+time_fg = "#a89984"
+
+[cmd_duration]
+disabled = true
+
+[custom.hostblock]
+description = "user@host with per host background color via ANSI"
+when = "true"
+shell = ["bash", "--noprofile", "--norc"]
+command = '''
+# --- Colors, as "R;G;B" decimal triples (NOT hex; ANSI truecolor needs RGB) ---
+host_bg="${STARSHIP_HOST_COLOR:-69;133;136}"   # block background; per-host, default blue
+text="251;241;199"                             # text color (near-white)
+next_bg="104;157;106"                          # the directory block's bg, for the arrow
+ 
+# --- Tiny helpers so the drawing below reads plainly ---
+fg() { printf '\033[38;2;%sm' "$1"; }          # start using foreground color $1
+bg() { printf '\033[48;2;%sm' "$1"; }          # start using background color $1
+reset() { printf '\033[0m'; }                  # stop all coloring
+ 
+# --- Draw " user@host " on the host color, then a  arrow into the next block ---
+fg "$host_bg"; printf ''
+fg "$text";    bg "$host_bg"; printf ' %s@%s ' "$USER" "$(hostname -s)"
+fg "$host_bg"; bg "$next_bg"; printf ''
+reset
+'''
+format = "$output"
+
+[username]
+show_always = true
+format = "[ $user](fg:text bg:${STARSHIP_HOST_COLOR})[@](fg:text bg:${STARSHIP_HOST_COLOR})"
+
+[hostname]
+ssh_only = false
+trim_at = "."
+format = "[$hostname ](fg:text bg:${STARSHIP_HOST_COLOR})"
+
+[directory]
+truncation_length = 3
+truncate_to_repo = false
+format = "[ $path ](fg:text bg:dir_bg)"
+
+[git_branch]
+format = "[ $symbol$branch ](fg:text bg:git_bg)"
+
+[git_status]
+format = "[$all_status$ahead_behind ](fg:text bg:git_bg)"
+
+[fill]
+symbol = " "
+
+[time]
+disabled = false
+time_format = "%H:%M"
+format = "[$time](fg:time_fg)"
+
+[os]
+disabled = false
+format = "[$symbol]($style)"
+style = "bold ${STARSHIP_OS_COLOR}"
+
+[os.symbols]
+Macos = ""
+Ubuntu = ""
+Windows = "󰨡"
+Linux = ""
+
+[character]
+format = " $symbol "
+success_symbol = "[](bold green)"
+error_symbol = "[](bold red)"
+
