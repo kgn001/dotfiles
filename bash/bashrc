@@ -1,36 +1,43 @@
 #!/usr/bin/env bash
+# ----- interactive guard -----
+case $- in
+	*i*) ;;
+	*) return ;;
+esac
 
 # ----- Appearance -----
 
 # ----- OS Detection -----
 case "$(uname -s)" in
-	Darwin) OS="mac" ;;
-	Linux)  OS="linux" ;;
+	Darwin) 
+		OS="mac" ;
+		export STARSHIP_OS_COLOR="light blue" ;;
+	Linux)  
+		OS="linux" ;
+		export STARSHIP_OS_COLOR="orange" ;;
 esac
-
-case "$(uname -s)" in
-	Darwin) export STARSHIP_OS_COLOR="light blue" ;;
-	Linux) export STARSHIP_OS_COLOR="orange" ;;
-esac
-
 
 # ----- Host checker -----
-DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-host_file="$DOTFILES_DIR/hosts/$(hostname -s).sh"
+host_file="$HOME/.config/bash/hosts/${HOSTNAME%%.*}.sh"
 [[ -f $host_file ]] && source "$host_file"
 
 # ----- HomeBrew (Mac only) -----
-# TODO move this to mac only file
 if [[ $OS == "mac" ]] && [[ -x /opt/homebrew/bin/brew ]]; then
 	eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
 
 # ----- PATH -----
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/.local/scripts:$PATH"
+for dir in "$HOME/.local/bin" "$HOME/.local/scripts"; do
+	case ":$PATH:" in
+		*":$dir:"*) ;;
+		*) PATH="$dir:$PATH" ;;
+	esac
+done
+unset dir
+export PATH
 
 # ----- History -----
-HISTCONTROL=ignoredups:erasdeups
+HISTCONTROL=ignoredups:erasedups
 HISTSIZE=10000
 HISTFILESIZE=20000
 shopt -s histappend
@@ -38,7 +45,6 @@ shopt -s histappend
 # ----- Defaults -----
 export EDITOR=nvim
 export VISUAL=nvim
-export STARSHIP_CONFIG="$HOME/.dotfiles/starship.toml"
 
 # ----- Aliases -----
 
@@ -52,7 +58,6 @@ alias gs='git status'
 alias root='cd /'
 alias dev='cd ~/dev'
 alias godot='cd ~/dev/godot'
-alias o="open ." # Open the current directory in Finder
 
 # Docker shortcuts
 alias dcu='docker compose up -d'
@@ -63,29 +68,37 @@ alias dcp='docker compose pull && docker compose up -d'
 # application shortcuts
 alias vi='nvim'
 alias vim='nvim'
-#alias ls='eza --icons'
-#alias ll='eza -l --icons --git'
-#alias la='eza -la --icons --git'
-#alias lt='eza --tree --icons'
+#alias ls='eza --icons --ignore-glob=".DS_Store"'
+#alias ll='eza -l --icons --git --ignore-glob=".DS_Store"'
+#alias la='eza -la --icons --git --ignore-glob=".DS_Store"'
+#alias lt='eza --tree --icons --ignore-glob=".DS_Store"'
 #alias cat='bat'
 #alias grep='rg'
 
-# config shortcuts - #TODO change this to open the non prod configs, maybe add a flag option to open prod with --prod?
-alias vimrc='vim ~/dev/.env/.config/nvim'
-alias bashrc='vim ~/dev/.env/.config/bashrc'
-alias loadbash='source ~/.bash_profile'
+# config shortcuts - #TODO maybe add a flag option to open prod with --prod?
+alias dotenv='cd ~/dev/.env'
+alias dotfiles='cd ~/dev/.env/dotfiles'
+alias bootstrap='cd ~/dev/.env/bootstrap'
+alias private='cd ~/dev/.env/private'
+alias vimrc='vim ~/dev/.env/dotfiles/nvim'
+alias bashrc='vim ~/dev/.env/dotfiles/bash/bashrc'
+alias loadbash='source ~/.bashrc'
 
-# fd/bat linux alias #TODO move this to linux only file
+# fd/bat linux alias
 # apt installs fd and bat as fdfind and batcat
 if [[ $OS == "linux" ]]; then
 	alias fd=fdfind
 	alias bat=batcat
 fi
 
+if [[ $OS == "mac" ]]; then
+	alias o="open ." # Open the current directory in Finder
+fi
+
 # ----- MKCD command -----
 function mkcd()
 {
-	mkdir $1 && cd $1
+	mkdir "$1" && cd "$1"
 }
 
 # ----- Fleet ping checker -----
@@ -112,12 +125,16 @@ sshl() {
 
 # ----- Tool Init -----
 command -v zoxide &>/dev/null && eval "$(zoxide init bash)"
-command -v fzf &>/dev/null && eval "$(fzf --bash)"
+command -v fzf &>/dev/null && eval "$(fzf --bash 2>/dev/null)"
 command -v starship &>/dev/null && eval "$(starship init bash)"
 command -v atuin &>/dev/null && eval "$(atuin init bash)"
 
 # ----- SSH Agent Re-direct -----
-export SSH_AUTH_SOCK="$HOME/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+if [[ $OS == "mac" ]]; then
+	secretive="$HOME/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh"
+	[[ -S $secretive ]] && export SSH_AUTH_SOCK="$secretive"
+	unset secretive
+fi
 
 # ----- Auto start TMUX over SSH -----
 if [[ -n $SSH_CONNECTION ]] && [[ -z $TMUX ]] && command -v tmux &>/dev/null; then

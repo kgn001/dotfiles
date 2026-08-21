@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# deploy - copy config modules from this repo out to their live locations
+#
+# looks for directories containing a .deploy file
+# file must contain at least one of dest= or map=
+# a .post-deploy file gets executed after a module is copied
+
+set 
+usage() {
+	cat <<-EOF
+	Usage: ./deploy [options] [module ...]
+
+	Copies config modules from this repo out to their live locations.
+	A Module is a directory at the root of this script containing a .deploy file.
+
+	Arguments:
+
+	  Options:
+	    -d, --dry            Show what would run, without executing
+
+	    -h, --help           Shows this help
+
+	  Module ...             Deploy only the named modules (default: all)
+
+	.deploy keys:
+	  dest=<dir>             Directory the module's contenta are copied to
+	  map=<src>:<path>       Copy one file to an exact path (repeatable)
+	  only=darwin|linux      Restrict this module to one OS
+	EOF
+}
+
+dry=0
+only_modules=()
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		-d|--dry) dry=1; shift ;;
+		-h|--help) usage; exit 0 ;;
+		-*) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+		*) only_modules+=("$1"); shift ;;
+	esac
+done
+
+

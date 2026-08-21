@@ -18,5 +18,9 @@ vim.opt.rtp:prepend(lazypath)
 vim.g.mapleader = " "
 vim.g.maplocalleader = "\\"
 
+-- Hide .DS_Store files in netrw
+vim.g.netrw_hide = 1
+vim.g.netrw_list_hide = [[^\.DS_Store$]]
+
 -- Setup lazy.nvim
 require("lazy").setup("kgn001.plugins")

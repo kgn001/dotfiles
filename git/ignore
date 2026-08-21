@@ -1,0 +1,8 @@
+# dotfiles/git/ignore
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+*.swp
+.direnv/
