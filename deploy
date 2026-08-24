@@ -5,12 +5,13 @@
 # file must contain at least one of dest= or map=
 # a .post-deploy file gets executed after a module is copied
 
-set 
+set -euo pipefail
+
 usage() {
 	cat <<-EOF
 	Usage: ./deploy [options] [module ...]
 
-	Copies config modules from this repo out to their live locations.
+	Copies Modules from this repo out to their live locations.
 	A Module is a directory at the root of this script containing a .deploy file.
 
 	Arguments:
@@ -26,19 +27,194 @@ usage() {
 	  dest=<dir>             Directory the module's contenta are copied to
 	  map=<src>:<path>       Copy one file to an exact path (repeatable)
 	  only=darwin|linux      Restrict this module to one OS
+
+	At least one of dest= or map= is required.
+
+	A \'.post-deploy\' script in a module is executed after a module is copied.
 	EOF
 }
+
+# CD to the repo directory so it can detect modules if being ran from somewhere else
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+case "$(uname -s)" in
+	Darwin) OS=darwin ;;
+	Linux)  OS=linux ;;
+	*)      OS=unknown ;;
+esac
 
 dry=0
 only_modules=()
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
-		-d|--dry) dry=1; shift ;;
+		-d|--dry)  dry=1; shift ;;
 		-h|--help) usage; exit 0 ;;
-		-*) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
-		*) only_modules+=("$1"); shift ;;
+		-*)        echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
+		*)         only_modules+=("$1"); shift ;;
 	esac
 done
 
+wanted() {
+	[[ ${#only_modules[@]} -eq 0 ]] && return 0
+	local m
+	for m in "${only_modules[@]}"; do
+		[[ $m == "$1" ]] && return 0
+	done
+	return 1
+}
 
+log() {
+	if [[ $dry == "1" ]]; then
+		echo "[DRY_RUN]: $*"
+	else
+		echo "$*"
+	fi
+}
+
+warn() { log "WARNING: $*" >&2; }
+
+if [[ -t 1 ]]; then
+	BOLD=$'\033[1;4m'
+	RESET=$'\033[0m'
+else
+	BOLD=$''
+	RESET=$''
+fi
+
+RULE='                                                                '
+header() {
+	local text=" $1 " pad rest
+	pad=$(( (${#RULE} - ${#text}) / 2 ))
+	[[ $pad -lt 3 ]] && pad=3
+	rest=$(( ${#RULE} - pad - ${#text} ))
+	[[ $rest -lt 3 ]] && rest=3
+	echo
+	log  "${BOLD}${RULE:0:pad}${text}${RULE:0:rest}${RESET}"
+}
+
+
+execute() {
+	log " ${*//$HOME/\~}"
+	if [[ $dry == "1" ]]; then
+		return
+	fi
+	"$@"
+}
+
+expand_path() {
+	local p="$1"
+	p=${p/#\~/$HOME}
+	p=${p//\$\{HOME\}/$HOME}
+	p=${p//\$HOME/$HOME}
+	printf '%s' "$p"
+}
+
+copy_file() {
+	local src=$1 target=$2
+
+	# Check if the file is different
+	if [[ ! -L $target && -f $target ]] && cmp -s "$src" "$target"; then
+		log " already up to date: ${target/#$HOME/\~}"
+		return
+	fi
+
+	# Check if it is a symlink
+	if [[ -L $target ]]; then
+		execute rm -f "$target"
+	elif [[ -f $target ]]; then
+		execute cp -p "$target" "$target.bak"
+	fi
+	
+	local dir
+	dir=$(dirname "$target")
+	if [[ ! -d $dir ]]; then
+		execute mkdir -p "$dir"
+	fi
+	execute cp -p "$src" "$target"
+}
+
+deploy_module() {
+	local mod=$1 name dest="" only="" key value
+	local map_src=() map_dst=() map_n=0
+	name=$(basename "$mod")
+
+	while IFS='=' read -r key value || [[ -n $key ]]; do
+		case "$key" in
+			''|'#'*) continue ;;
+			dest) dest=$(expand_path "$value") ;;
+			only) only=$value ;;
+			map)
+				if [[ $value != *:* ]]; then
+					warn "$name: bad map (need src:dest): $value" 
+					continue
+				fi
+				map_src[$map_n]="${value%%:*}"
+				map_dst[$map_n]="$(expand_path "${value#*:}")"
+				map_n=$((map_n + 1))
+				;;
+			*) warn "$name: ignoring unrecognized key: $key" ;;
+		esac
+	done < "$mod/.deploy"
+
+	if [[ -z $dest && $map_n -eq 0 ]]; then
+		warn "$name: no dest or map in .deploy - Skipping"
+		return
+	fi
+	if [[ -n $only && $only != "$OS" ]]; then
+		header "Skipping $name (only=$only, this is $OS)"
+		return
+	fi
+
+	header "Deploying $name"
+
+	local i
+	for ((i = 0; i < map_n; i++)); do
+		if [[ -f "$mod/${map_src[$i]}" ]]; then
+			copy_file "$mod/${map_src[$i]}" "${map_dst[$i]}"
+		else
+			warn "$name: map source not found: ${map_src[$i]}"
+		fi
+	done
+
+	if [[ -n $dest ]]; then
+		local f rel mapped
+		while IFS= read -r -d '' f; do
+			rel=${f#"$mod"/}
+			mapped=0
+			for ((i = 0; i < map_n; i++)); do
+				if [[ $rel == "${map_src[$i]}" ]]; then
+					mapped=1
+					break
+				fi
+			done
+			if [[ $mapped -eq 1 ]]; then
+				continue
+			fi
+			copy_file "$f" "$dest/$rel"
+		done < <(find "$mod" -type f \
+			! -name '.deploy'\
+			! -name '.post-deploy'\
+			! -name '.DS_Store'\
+			-print0)
+	fi
+
+	if [[ -x "$mod/.post-deploy" ]]; then
+			execute "$mod/.post-deploy"
+	fi
+}
+
+found=0
+for mod in "$repo"/*/; do
+	mod=${mod%/}
+	[[ -f "$mod/.deploy" ]] || continue
+	name=$(basename "$mod")
+	wanted "$name" || continue
+	found=1
+	deploy_module "$mod"
+done
+
+if [[ $found -eq 0 ]]; then
+	warn "no modules found"
+fi
+exit 0
