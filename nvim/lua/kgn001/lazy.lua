@@ -23,4 +23,6 @@ vim.g.netrw_hide = 1
 vim.g.netrw_list_hide = [[^\.DS_Store$]]
 
 -- Setup lazy.nvim
-require("lazy").setup("kgn001.plugins")
+require("lazy").setup("kgn001.plugins", {
+	rocks = { enabled = false },
+})
