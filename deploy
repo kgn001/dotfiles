@@ -66,9 +66,9 @@ wanted() {
 
 log() {
 	if [[ $dry == "1" ]]; then
-		echo "[DRY_RUN]: $*"
+		echo "[DRY_RUN]: ${*//$HOME/\~}"
 	else
-		echo "$*"
+		echo "${*//$HOME/\~}"
 	fi
 }
 
@@ -95,7 +95,7 @@ header() {
 
 
 execute() {
-	log " ${*//$HOME/\~}"
+	log " $*"
 	if [[ $dry == "1" ]]; then
 		return
 	fi
@@ -115,7 +115,7 @@ copy_file() {
 
 	# Check if the file is different
 	if [[ ! -L $target && -f $target ]] && cmp -s "$src" "$target"; then
-		log " already up to date: ${target/#$HOME/\~}"
+		log " already up to date: $target"
 		return
 	fi
 
