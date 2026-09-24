@@ -42,6 +42,16 @@ HISTSIZE=10000
 HISTFILESIZE=20000
 shopt -s histappend
 
+# ----- Note function -----
+note() {
+	local dir="$HOME/notes"
+	local file="$dir/$(date +%Y-%m)-$(hostname -s).md"
+	local day="$(date '+%a %d')"
+	mkdir -p "$dir"
+	grep -qs "^## $day\$" "$file" || printf '\n## %s\n\n' "$day" >> "$file"
+	printf -- '- %s %s\n' "$(date +%H:%M)" "$*" >> "$file"
+}
+
 # ----- Defaults -----
 export EDITOR=nvim
 export VISUAL=nvim
