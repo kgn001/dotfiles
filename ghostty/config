@@ -6,3 +6,5 @@ background-opacity = 1
 
 clipboard-write = allow
 copy-on-select = clipboard
+
+shell-integration-features = ssh-env,ssh-terminfo
