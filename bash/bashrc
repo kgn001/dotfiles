@@ -55,6 +55,7 @@ note() {
 # ----- Defaults -----
 export EDITOR=nvim
 export VISUAL=nvim
+export SUDO_EDITOR=nvim
 
 # ----- Aliases -----
 
